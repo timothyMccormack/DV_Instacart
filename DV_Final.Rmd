@@ -1,0 +1,113 @@
+---
+title: "DV_Final"
+author: "Tim McCormack"
+date: "4/17/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include = FALSE}
+library(tidyverse)
+library(ggplot2)
+library(plotly)
+library(magrittr)
+```
+
+
+```{r}
+aisles <- read.csv("aisles.csv")
+dep <- read.csv("departments.csv")
+order_p <- read.csv("order_products__prior.csv")
+orders <- read.csv("orders.csv")
+products <- read.csv("products.csv")
+
+```
+
+
+```{r}
+head(order_p,20)
+
+orderSize <- orderSize %>% filter()
+
+orderSize <- order_p %>% group_by(order_id) %>% summarise(count = n()) 
+```
+
+
+```{r}
+orderSize <- orderSize 
+hist(orderSize$count)
+
+```
+
+
+```{r}
+head(orderSize)
+
+fig <- plot_ly(x = orderSize$count, type = "histogram", histnorm = "probability", marker = list(color = "#00CC96")) %>% layout(xaxis = list(tickformat = "digits", title = "# Of Items"), title = "Distribution of Order Sizes", yaxis = list(title = "Proportion Of Orders"))
+fig
+
+```
+
+
+
+```{r}
+head(products)
+
+productOrders1 <- merge(order_p, products, by = "product_id")
+
+```
+
+
+```{r}
+head(productOrders1)
+nrow(productOrders1)
+
+productPopularity <- productOrders1 %>% group_by(product_name) %>% summarise(avgPlacement = mean(add_to_cart_order), avgReOrder = mean(reordered), numOrders = n() )
+
+```
+
+
+```{r}
+
+pnames <- head(productPopularity %>% arrange(-numOrders),350)
+keep_names <- pnames$product_name
+
+```
+
+
+```{r}
+pnames
+
+```
+
+```{r}
+unpopularProducts <- productPopularity %>% filter(!product_name %in% keep_names)
+sum(unpopularProducts$numOrders)
+
+```
+
+
+```{r}
+hist(productPopularity$numOrders, bins = 100)
+
+#ggplot(data = productPopularity, aes(x = product_name, y = numOrders)) + geom_bar(stat = "identity")
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

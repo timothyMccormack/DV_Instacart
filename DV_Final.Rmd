@@ -96,6 +96,46 @@ hist(productPopularity$numOrders, bins = 100)
 #ggplot(data = productPopularity, aes(x = product_name, y = numOrders)) + geom_bar(stat = "identity")
 ```
 
+```{r}
+
+new <- merge(x=productPopularity,y=products,by="product_name",all=T)
+new <- select(new, -1,-2,-3,-5,-6)
+new <- merge(x=dep,y=new,by='department_id',all=T)
+
+new<- new %>% 
+  group_by(department, department_id) %>% 
+  summarise(Total = sum(numOrders, na.rm = TRUE))
+
+new
+
+
+ggplot(new, aes(x="", y=Total, fill=department)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) +
+  
+  theme_void() # remove background, grid, numeric labels
+
+#removing smallest groups
+new2 <- new %>%
+  filter(department != c('bulk')) %>%
+  filter(department != c('other')) %>%
+  filter(department != c('missing')) %>%
+  filter(department != c('pets')) %>%
+  filter(department != c('international')) %>%
+  filter(department != c('alcohol')) %>%
+  filter(department != c('breakfast')) %>%
+  filter(department != c('babies')) %>%
+  filter(department != c('personal care'))
+
+ggplot(new2, aes(x="", y=Total, fill=department)) +
+  geom_bar(stat="identity", width=1, color="white") +
+  coord_polar("y", start=0) +
+  
+  theme_void()
+
+
+```
+
 
 
 

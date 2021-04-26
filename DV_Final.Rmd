@@ -136,6 +136,41 @@ ggplot(new2, aes(x="", y=Total, fill=department)) +
 
 ```
 
+```{r}
+
+new <- merge(x=productPopularity,y=products,by="product_name",all=T)
+new <- merge(x=new,y=dep,by="department_id",all=T)
+
+new2 <- new %>%
+  filter(department != c('bulk')) %>%
+  filter(department != c('other')) %>%
+  filter(department != c('missing')) %>%
+  filter(department != c('pets')) %>%
+  filter(department != c('international')) %>%
+  filter(department != c('alcohol')) %>%
+  filter(department != c('breakfast')) %>%
+  filter(department != c('babies')) %>%
+  filter(department != c('personal care'))
+
+
+new2 %>%
+  ggplot(aes(x=department, y=avgReOrder))+
+  geom_col()+
+  scale_x_discrete(guide = guide_axis(n.dodge=3))
+
+#new
+
+orders %>% 
+  ggplot(aes(x=order_hour_of_day)) + 
+  geom_histogram(stat="count")
+
+
+orders %>% 
+  ggplot(aes(x=days_since_prior_order)) + 
+  geom_histogram(stat="count")
+
+```
+
 
 
 

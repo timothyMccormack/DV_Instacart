@@ -1,0 +1,260 @@
+---
+title: "dvFP-3"
+author: "Tim McCormack"
+date: "4/23/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include = FALSE}
+library(tidyverse)
+library(ggplot2)
+library(plotly)
+library(magrittr)
+library(plyr)
+```
+
+## Read in Data
+
+```{r}
+groceries <- read.csv("Groceries_dataset.csv")
+
+```
+
+
+```{r}
+head(groceries)
+```
+
+1. Convert Date Column to date type in R
+
+```{r}
+x <- c("2015-07-01", "2015-08-01", "2015-09-01")
+as.Date(x)
+```
+
+```{r}
+z <- c("21-05-2015")
+as.Date(z, format = "%d-%m-%Y")
+
+```
+```{r}
+groceries <- groceries %>% mutate(date_order = as.Date(Date, format = "%d-%m-%Y")) 
+groceries
+
+
+```
+
+
+
+```{r}
+byDay <- groceries %>% group_by(date_order) %>% summarise(count = n())
+byDay2014 <- byDay %>% filter(format(date_order, '%Y') == 2014)
+#byDay2014
+
+byDay2015 <- byDay %>% filter(format(date_order, '%Y') == 2015)
+```
+
+
+
+```{r}
+colors = c("2014" = "red", "2015" = "blue")
+
+p <- ggplot() + geom_point(data = byDay2014, aes(x = date_order, y = count, col = "2014")) + geom_line(data = byDay2014, aes(x = date_order, y = count), col = "red")
+p + geom_point(data = byDay2015, aes(x = date_order, y = count, col = "2015")) + geom_line(data = byDay2015, aes(x = date_order, y = count), col = "blue") + scale_color_manual(values = colors) +  labs(x = "Year-Month",
+         y = "# of Orders",
+         color = "Year") + ggtitle("Number of Orders Over Time") + theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+
+```{r}
+df2014 <- sample_n(byDay2014, 50)
+df2015 <- sample_n(byDay2015, 50)
+df2014
+
+p <- ggplot() + geom_point(data = df2014, aes(x = date_order, y = count, col = "2014")) + geom_line(data = df2014, aes(x = date_order, y = count), col = "red")
+p + geom_point(data = df2015, aes(x = date_order, y = count, col = "2015")) + geom_line(data = df2015, aes(x = date_order, y = count), col = "blue") + scale_color_manual(values = colors) +  labs(x = "Year-Month",
+         y = "# of Orders",
+         color = "Year") + ggtitle("Number of Orders Over Time") + theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+Average Number of Items per Customer in a Day
+
+```{r}
+df <- groceries %>% group_by(Member_number, Date) %>% summarise(count = n())
+mean(df$count)
+```
+
+
+```{r}
+hist(df$count)
+
+ggplot(data = df, aes(x = count)) + geom_histogram(binwidth = 1, fill = "#AB63FA") + xlab("# of Items in a shop")
+
+```
+
+
+
+Association Rule Learning
+```{r}
+groceries %>% group_by(Member_number,Date) %>% summarise(value = c(itemDescription))
+
+```
+
+```{r}
+head(groceries)
+
+transactionData <- ddply(groceries, c("Member_number", "date_order"), function(df1)paste(df1$itemDescription, collapse = ","))
+```
+
+```{r}
+head(transactionData)
+```
+
+```{r}
+transactionData$Member_number <- NULL
+transactionData$date_order <- NULL
+
+```
+
+```{r}
+colnames(transactionData) <- c("items")
+head(transactionData)
+
+```
+
+basket form
+
+```{r}
+write.csv(transactionData,"C:/Users/PMC/Desktop/Data_Viz/market_basket_transactions.csv", quote = FALSE, row.names = FALSE)
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+#install and load package arules
+#install.packages("arules")
+library(arules)
+#install and load arulesViz
+#install.packages("arulesViz")
+library(arulesViz)
+#install and load tidyverse
+#install.packages("tidyverse")
+library(tidyverse)
+#install and load readxml
+#install.packages("readxml")
+library(readxl)
+#install and load knitr
+#install.packages("knitr")
+library(knitr)
+#load ggplot2 as it comes in tidyverse
+library(ggplot2)
+#install and load lubridate
+#install.packages("lubridate")
+library(lubridate)
+#install and load plyr
+#install.packages("plyr")
+library(plyr)
+library(dplyr)
+
+```
+
+
+
+```{r}
+tr <- read.transactions("market_basket_transactions.csv", format = 'basket', sep=',')
+
+```
+
+```{r}
+tr
+
+summary(tr)
+```
+
+
+```{r}
+library(RColorBrewer)
+itemFrequencyPlot(tr,topN=20,type="absolute",col=brewer.pal(8,'Pastel2'), main="Absolute Item Frequency Plot")
+
+
+```
+
+
+
+```{r}
+association.rules <- apriori(tr, parameter = list(supp=0.001, conf=0.1,maxlen=5))
+```
+
+```{r}
+summary(association.rules)
+
+```
+
+```{r}
+inspect(association.rules)
+
+```
+
+
+
+
+
+
+
+
+
+```{r}
+groceries <- groceries %>% mutate(Day = as.numeric(substr(Date, 1, 2)), Month = as.numeric(substr(Date,4,5)), Year = as.numeric(substr(Date,7,10)))
+```
+
+
+```{r}
+groceries <- groceries %>% arrange(Year,Month,Day)
+```
+
+
+
+```{r}
+# calculate number of orders per day
+byDay <- groceries %>% group_by(Date) %>% summarise(count = n())
+byDay <- byDay %>% mutate(Year = substr(Date,7,10) , Date2 = substr(Date, 1, 5), Day = as.numeric(substr(Date, 1, 2)), Month = as.numeric(substr(Date,4,5)))
+byDay
+```
+
+```{r}
+byDay2014 <- byDay %>% filter(Year == "2014")
+byDay2014 <- byDay2014 %>% arrange(Month,Day)
+
+```
+
+```{r}
+fig <- plot_ly(data = byDay2014, x = ~Date2, y = ~count, type = 'scatter')
+fig
+```
+
+
+```{r}
+
+
+df <- head(byDay2014,nrow(byDay2014))
+df
+df <- df %>% mutate(d = as.Date(Date2, format = '%d-%m'))
+
+df
+```
+
+```{r}
+df %>% mutate(d2 = case_when(format(d, '%Y') == 2021 ~ 2014))
+
+```
+
+
+```{r}
+ggplot(data = df, aes(x = d, y = count)) + geom_point()
+
+```

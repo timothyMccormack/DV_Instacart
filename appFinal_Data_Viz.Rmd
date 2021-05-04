@@ -1,0 +1,837 @@
+---
+title: "DVFP_App"
+author: "Tim McCormack"
+date: "5/1/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+aisles <- read.csv("groceryKart/aisles.csv")
+dep <- read.csv("groceryKart/departments.csv")
+order_p <- read.csv("groceryKart/order_products__prior.csv")
+orders <- read.csv("groceryKart/orders.csv")
+products <- read.csv("groceryKart/products.csv")
+
+```
+
+
+```{r}
+library(shiny)
+library(ggplot2)
+library(dplyr)
+library(magrittr)
+library(scales)
+library(gridExtra)
+library(cowplot)
+library(plotly)
+library(treemap)
+library(gridBase)
+library(highcharter)
+library(ECharts2Shiny)
+library(shinythemes)
+library(treemap)
+library(data.table)
+
+```
+
+```{r}
+aisles <- fread("groceryKart/aisles.csv")
+dep <- fread("groceryKart/departments.csv")
+order_p <- fread("groceryKart/order_products__prior.csv")
+orders <- fread("groceryKart/orders.csv")
+products <- fread("groceryKart/products.csv")
+
+```
+
+
+
+```{r}
+productOrders1 <- merge(order_p, products, by = "product_id")
+
+productPopularity <- productOrders1 %>% group_by(product_name) %>% summarise(avgPlacement = mean(add_to_cart_order), avgReOrder = mean(reordered), numOrders = n() )
+
+pnames <- head(productPopularity %>% arrange(-numOrders),350)
+keep_names <- pnames$product_name
+
+```
+Ben's Data
+
+```{r}
+new <- merge(x=productPopularity,y=products,by="product_name",all=T)
+new <- merge(x=new,y=dep,by="department_id",all=T)
+
+
+new2 <- merge(x=productPopularity,y=products,by="product_name",all=T)
+new2 <- select(new2, -1,-2,-3,-5,-6)
+new2 <- merge(x=dep,y=new2,by='department_id',all=T)
+
+new2<- new2 %>% 
+    group_by(department, department_id) %>% 
+    summarise(Total = sum(numOrders, na.rm = TRUE))
+
+```
+
+```{r}
+head(new2)
+
+```
+
+
+```{r}
+orders <- orders %>% mutate(dow = case_when(order_dow == 0 ~ "Sunday", 
+                                  order_dow == 1 ~ "Monday",
+                                  order_dow == 2 ~ "Tuesday", 
+                                  order_dow == 3 ~ "Wednesday",
+                                  order_dow == 4 ~ "Thursday",
+                                  order_dow == 5 ~ "Friday",
+                                  order_dow == 6 ~ "Saturday"))
+head(orders)
+
+orders$dow <- factor(orders$dow, levels = c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))
+
+```
+
+byReorder
+
+
+```{r}
+byReorder <- order_p %>% group_by(reordered) %>% dplyr::summarise(count = n())
+
+byReorder <- byReorder %>% mutate(re = case_when(reordered == 0 ~ "No", reordered == 1 ~ "Yes" ))
+```
+
+```{r}
+ggplot(data = byReorder, aes(x = re, y = count)) + geom_bar(stat = "identity", fill="#AB63FA", color = "black") + scale_y_continuous(labels = comma) + xlab("Re-ordered") + ylab("Count") + ggtitle("Distribution of Reordered Products in Instacart App") + theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+OrganicDf
+
+```{r}
+library(stringr)
+products <- products %>% mutate(organic = ifelse(str_detect(str_to_lower(products$product_name),'organic'),"Organic","Not Organic"), organic= as.factor(organic))
+
+organicDf <- products %>% group_by(organic) %>% dplyr::summarise(count = n())
+
+```
+
+
+
+Organic Re-orders
+
+```{r}
+tmp <- order_p %>% left_join(products, by = "product_id")
+head(tmp)
+
+tmp2 <- tmp %>% group_by(organic) %>% dplyr::summarise(mre = mean(reordered))
+
+head(tmp2)
+```
+
+
+#sidebarLayout(sidebarPanel(sliderInput("bins", label = "s",value = 30, min = 0, max = 50)), mainPanel(plotOutput("organic2")) ) , 
+
+
+
+
+numOrders:
+
+```{r}
+p <- order_p %>% group_by(order_id) %>% dplyr::summarise(count = n())
+p
+```
+
+```{r}
+head(order_p)
+
+```
+
+
+```{r}
+
+orderSize <- p %>% arrange(count)
+
+#ggplot(data = orderSize, aes(x = count)) + geom_histogram(stat = "count", fill= "#AB63FA")
+
+
+```
+
+```{r}
+
+
+ggplot(data = orderSize, aes(x = count)) + geom_histogram(stat = "count", fill= "#FF6692") + scale_y_continuous(labels = comma) + xlab("Size of Order") + ylab("Frequency") + ggtitle("Distribution of Order Size in Instacart Service")  + theme(plot.title = element_text(hjust = 0.5))
+
+
+```
+
+```{r}
+tmp <- tmp %>% mutate(isOrganic = case_when(organic == "Organic" ~ 1, organic == "Not Organic" ~ 0))
+```
+
+```{r}
+head(tmp)
+
+```
+
+
+```{r}
+tmp7 <- tmp %>% group_by(order_id) %>% dplyr::summarise(count = n(), organicRatio = mean(isOrganic)) 
+
+head(tmp7)
+
+```
+
+
+```{r}
+
+orderSize2 <- tmp7 
+
+
+
+```
+
+
+```{r}
+orderSize2 <- orderSize2 %>% arrange(count)
+
+tmp11 <- orderSize2 %>% filter(count > 3)
+
+head(orderSize2)
+```
+
+
+
+
+```{r}
+sampOrder <- sample_n(orderSize2,1000)
+
+sampOrder <- sampOrder %>% arrange(count)
+
+sampOrder
+
+```
+
+sampOrder
+
+```{r}
+
+ggplot(data = sampOrder, aes(x = count, y = organicRatio)) + geom_point(size=3, shape=21, fill= "#AB63FA", color="black", alpha=0.8, color = "black") + labs(title="Order Size vs. Ratio of Organic Products",subtitle = "Data on 200,000 Instacart Users",x = "# of Products in Order",y = "Ratio of Organic Products") + geom_smooth(span=1, se=FALSE, color = "black" )
+
+```
+
+
+```{r}
+library(treemap)
+tmp3 <- products %>% group_by(department_id, aisle_id) %>% dplyr::summarize(n=n())
+
+tmp3 <- tmp3 %>% left_join(dep,by="department_id")
+tmp3 <- tmp3 %>% left_join(aisles,by="aisle_id")
+head(tmp3)
+
+
+
+tmp4 <- order_p %>% 
+  group_by(product_id) %>% 
+  dplyr::summarize(count=n()) %>% 
+  left_join(products,by="product_id") %>% 
+  ungroup() %>% 
+  group_by(department_id,aisle_id) %>% 
+  dplyr::summarize(sumcount = sum(count)) %>% 
+  left_join(tmp3, by = c("department_id", "aisle_id")) %>% 
+  mutate(onesize = 1)
+
+
+treemap(tmp4,index=c("department","aisle"),vSize="onesize",vColor="department",palette="Set3",title="",sortID="-sumcount", border.col="#FFFFFF",type="categorical", fontsize.legend = 0,bg.labels = "#FFFFFF")
+
+```
+
+```{r}
+
+```
+
+```{r}
+#library(highcharter)
+
+#hctreemap2(tmp4, group_vars = c("department","aisle"), size_var = "aisle")
+
+```
+
+
+```{r}
+head(organicDf)
+
+organicDf <- organicDf %>% mutate(total = sum(count), prop = count / total)
+
+organicDf
+```
+
+
+```{r}
+
+byReorder <- byReorder %>% mutate(total = sum(count), prop = count / total)
+
+head(byReorder)
+
+```
+
+```{r}
+head(orders)
+
+dowDf <-orders %>% group_by(dow) %>% dplyr::summarise(count = n())
+
+head(dowDf)
+
+dowDf <- dowDf %>% mutate(total = sum(count), prop = count/total)
+
+head(dowDf)
+```
+
+tags$style('.container-fluid {
+                             background-color: "white";
+              }'),
+
+
+
+```{r}
+
+library(plotly)
+
+fig <- plot_ly(
+  type="treemap",
+  labels=c("Eve", "Cain", "Seth", "Enos", "Noam", "Abel", "Awan", "Enoch", "Azura"),
+  parents=c("", "Eve", "Eve", "Seth", "Seth", "Eve", "Eve", "Awan", "Eve")
+)
+fig
+
+```
+
+tmp15
+
+```{r}
+
+tmp15 <- products %>% group_by(department_id, aisle_id) %>% dplyr::summarize(n=n())
+
+tmp15 <- tmp15 %>% left_join(dep,by="department_id")
+tmp15 <- tmp15 %>% left_join(aisles,by="aisle_id")
+head(tmp15)
+
+treemap(tmp15,index=c("department","aisle"),vSize="n",title="",palette="Set3",border.col="#FFFFFF")
+
+
+
+```
+
+
+```{r}
+fig <- plot_ly(x = orderSize$count, type = "histogram", histnorm = "probability", marker = list(color = "#00CC96")) %>% layout(xaxis = list(tickformat = "digits", title = "# Of Items"), title = "Distribution of Order Sizes", yaxis = list(title = "Proportion Of Orders"))
+fig
+```
+
+
+
+
+```{r}
+#plot_ly(data=new, x=~department, y=~avgReOrder, type = "bar")
+
+plot_ly(data=orders, x = ~order_hour_of_day, type = "histogram")
+```
+
+
+## In-person Data
+
+```{r}
+groceries <- read.csv("groceryKart/Groceries_dataset.csv")
+
+x <- c("2015-07-01", "2015-08-01", "2015-09-01")
+as.Date(x)
+
+z <- c("21-05-2015")
+as.Date(z, format = "%d-%m-%Y")
+
+groceries <- groceries %>% mutate(date_order = as.Date(Date, format = "%d-%m-%Y")) 
+
+byDay <- groceries %>% group_by(date_order) %>% dplyr::summarise(count = n())
+byDay2014 <- byDay %>% filter(format(date_order, '%Y') == 2014)
+#byDay2014
+
+byDay2015 <- byDay %>% filter(format(date_order, '%Y') == 2015)
+
+fit <- lm(count ~ date_order, data = byDay)
+summary(fit)
+
+```
+
+```{r}
+
+fit <- lm(count ~ date_order, data = byDay)
+
+byDay <- byDay %>% mutate(Year = substr(date_order, 0, 4))
+
+head(byDay)
+
+```
+
+
+```{r}
+
+fit <- lm(count ~ date_order, data = byDay)
+
+
+ggplot(data = byDay, aes(x = date_order, y = count, color = Year)) + geom_point() + stat_function(fun= function(x) predict(fit, newdata=data.frame(date_order=x), type='response'), size = 1, color = "black") + labs(x = "Year-Month",y = "# of Orders", color = "Year") +  ggtitle("Number of Orders Over Time") + theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+
+```{r}
+grocery <- groceries
+```
+
+
+```{r}
+
+library(lubridate)  # Used to change date field to date class
+library(tidyverse)
+library(lubridate)  # Used to change date field to date class
+library(arules)     # Needed for market basket analysis
+#library(arulesViz)  # Used for market basket visualizations
+#library(scales)
+library(knitr)
+
+
+names(grocery) <- c("memberid", "date", "item")
+  grocery$memberid <- as_factor(grocery$memberid)
+  grocery$date <- as_date(dmy(grocery$date))
+  grocery$item <- as_factor(grocery$item)
+# Create new columns
+  grocery$transid <- as_factor(paste0(grocery$memberid, unclass(grocery$date)))
+    # Note that date portion of the transaction id is the number of days since January 1, 1970
+  grocery$month <- month(grocery$date)
+  grocery$weekday <- weekdays(grocery$date)
+# How many shopping trips were there?
+  numBaskets <- length(unique(grocery$transid))
+  paste0("There were ",numBaskets, " individual transactions.")
+
+
+```
+
+
+
+```{r}
+itemlist <- unique(grocery$item)
+numItems <- length(itemlist)
+memberlist <- unique(grocery$memberid)
+numMembers <- length(memberlist)
+
+```
+
+```{r}
+head(itemlist,10)
+
+```
+
+```{r}
+itemDist <- groceries %>% group_by(itemDescription) %>% dplyr::summarise(count = n())
+itemDist
+```
+
+
+
+
+```{r}
+itemDist1 <- itemDist %>% arrange(-count) %>% head(10)
+
+itemDist1$itemDescription <- factor(itemDist1$itemDescription, levels = c("whole milk", "other vegetables", "rolls/buns", "soda", "yogurt", "root vegetables", "tropical fruit", "bottled water", "sausage", "citrus fruit"))
+
+itemDist1 <- itemDist1 %>% mutate(total = sum(count), prop = count/total)
+
+
+ggplot(data = itemDist1, aes(x = itemDescription, y = count)) + geom_bar(stat = "identity" , fill = "#FF6692" ) + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + geom_label(aes(label = round(prop, 2), y = count - 200), color = "black", fill = "#FF6692", size = 3.2) + xlab("Product Name") + ylab("Count") + ggtitle("Top 10 Most Frequent Products Bought In-Person") + theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+
+
+```{r}
+library(lubridate)
+groceries 
+
+grocery <- groceries
+
+names(grocery) <- c("memberid", "date", "item", "date2")
+  grocery$memberid <- as_factor(grocery$memberid)
+  grocery$date <- as_date(dmy(grocery$date))
+  grocery$item <- as_factor(grocery$item)
+# Create new columns
+  grocery$transid <- as_factor(paste0(grocery$memberid, unclass(grocery$date)))
+    # Note that date portion of the transaction id is the number of days since January 1, 1970
+  grocery$month <- month(grocery$date)
+  grocery$weekday <- weekdays(grocery$date)
+# How many shopping trips were there?
+  numBaskets <- length(unique(grocery$transid))
+  paste0("There were ",numBaskets, " individual transactions.")
+```
+
+```{r}
+head(grocery)
+```
+
+
+```{r}
+# Pull out shopping trips by unique transaction id
+days <- unique(data.frame(weekday = grocery$weekday, transid = grocery$transid))
+
+# Make sure the days of the week are in order
+days$weekday <- factor(days$weekday, levels = c('Sunday', 'Monday', 'Tuesday',
+                               'Wednesday', 'Thursday', 'Friday', 'Saturday'))
+
+
+days
+
+dailyPurchases <- days %>%
+  group_by(weekday) %>%
+  dplyr::summarize(n = n())
+
+
+
+days1 <- days %>% group_by(weekday) %>% dplyr::summarise(count = n())
+
+days1 <- days1 %>% mutate(total = sum(count), prop = count / total)
+
+days1
+                                                         
+ggplot(data = days1, aes(x = weekday, y = count)) + geom_bar(stat = "identity", fill = "#AB63FA") + xlab("") + ylab("Count") + geom_label(aes(label = round(prop, 2), y = count - 100), color = "white", fill = "#AB63FA", size = 3.2) + ggtitle("Distribution of Transactions Per Weekday") + theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{r}
+head(days1)
+
+```
+
+
+
+
+```{r}
+colors = c("2014" = "red", "2015" = "blue")
+
+p <- ggplot() + geom_point(data = byDay2014, aes(x = date_order, y = count, col = "2014")) + geom_line(data = byDay2014, aes(x = date_order, y = count), col = "red")
+p + geom_point(data = byDay2015, aes(x = date_order, y = count, col = "2015")) + geom_line(data = byDay2015, aes(x = date_order, y = count), col = "blue") + scale_color_manual(values = colors) +  labs(x = "Year-Month",
+         y = "# of Orders",
+         color = "Year") + ggtitle("Number of Orders Over Time") + theme(plot.title = element_text(hjust = 0.5)) + stat_function(fun= function(x) predict(fit, newdata=data.frame(date_order=x), type='response'), size = 1.25)
+
+```
+
+
+
+
+```{r}
+library(arules)
+#install and load arulesViz
+#install.packages("arulesViz")
+library(arulesViz)
+#install and load tidyverse
+#install.packages("tidyverse")
+library(tidyverse)
+#install and load readxml
+#install.packages("readxml")
+library(readxl)
+#install and load knitr
+#install.packages("knitr")
+library(knitr)
+#load ggplot2 as it comes in tidyverse
+library(ggplot2)
+#install and load lubridate
+#install.packages("lubridate")
+library(lubridate)
+#install and load plyr
+#install.packages("plyr")
+library(plyr)
+library(dplyr)
+
+
+```
+
+```{r}
+tr <- read.transactions("market_basket_transactions.csv", format = 'basket', sep=',')
+head(tr)
+```
+
+```{r}
+summary(tr)
+```
+
+
+```{r}
+association.rules <- apriori(tr, parameter = list(supp=0.001, conf=0.1,maxlen=5))
+
+```
+
+```{r}
+summary(association.rules)
+
+```
+
+```{r}
+df_m <- inspect(association.rules)
+df_m
+```
+
+
+```{r}
+df_m <- df_m %>% mutate(lhs = gsub('[{}]', '', lhs)) %>% mutate(rhs = gsub('[{}]', '', rhs))
+df_m
+```
+
+
+```{r}
+df_m2 <- na.omit(df_m)
+
+df_m3 <- df_m2 %>% select(lhs, rhs, confidence) %>% filter(lhs == "pot plants" )
+
+df_m3 <- df_m3 %>% mutate(rhs = case_when(rhs == "other vegetables" ~ "other veg", rhs != "other vegetables" ~ rhs))
+df_m3
+```
+
+
+```{r}
+df_m2 %>% select(lhs, rhs, confidence) %>% filter(lhs == "pasta") %>% mutate(word = rhs, freq = confidence*10) %>% select(word, freq)
+```
+
+```{r, message=FALSE}
+library(wordcloud)
+
+wordcloud(df_m3$rhs, df_m3$confidence , scale=c(5, .5), random.order = FALSE, random.color = FALSE, colors= c("indianred1","indianred2","indianred3","indianred") )
+
+```
+
+
+
+```{r}
+thing <- "{pot plants}"
+
+gsub('[{}]', '', thing)
+
+```
+
+
+```{r}
+df_m3 %>% mutate(MY = paste(rhs, confidence ))
+
+df_m5 <- df_m3 %>% mutate(word = rhs, freq = confidence * 10)
+
+df_m5 <- df_m5 %>% select(word,freq)
+df_m5
+```
+
+11
+
+```{r}
+wordcloud2(df_m5, backgroundColor = "white", size = 0.5)
+```
+
+```{r}
+
+prThings <- unique(df_m2$lhs)
+```
+
+
+```{r}
+df_m6 <- df_m2 %>% select(lhs, rhs, confidence)
+df_m6
+```
+
+```{r}
+
+```
+
+
+```{r}
+library(shiny)
+library(ggplot2)
+library(dplyr)
+library(magrittr)
+library(scales)
+library(gridExtra)
+library(cowplot)
+library(plotly)
+library(treemap)
+library(gridBase)
+library(highcharter)
+library(ECharts2Shiny)
+library(shinythemes)
+library(treemap)
+library(RColorBrewer)
+library(wordcloud)
+library(wordcloud2)
+library(tm)
+
+vwr = dialogViewer('modellvergleiche-irt-with-brms', width = 1600, height = 1200)
+
+ui <-fluidPage(
+  
+  theme = shinytheme("journal"),
+  
+  titlePanel("Instacart Dashboard"),
+  
+  mainPanel(
+    tabsetPanel( type = "tab",  tabPanel(  "Departments", plotlyOutput("plotly1"), plotlyOutput("p2")), tabPanel("Instacart Summary Statistics",  plotOutput("byReorder"), plotOutput("organic")  ), tabPanel("Order Statistics", plotlyOutput("p3"), plotlyOutput("p4")),
+                 tabPanel("Order Size Analysis Tool", sidebarLayout(sidebarPanel(sliderInput("organicRatio", label = "What is the minimum proportion of organic products in the order? ", value = 0, min = 0, max = 1),sliderInput("bins", label = "Number of Bins: ",value = 30, min = 0, max = 150)), mainPanel(plotOutput("os")) ), plotOutput("os2") )
+                 , tabPanel("Store Layout",  plotOutput("pltTreemap") ), tabPanel("In-Person Timeseries", plotOutput("plotTS"), plotOutput("itemFreq")), tabPanel("Association Rule Mining",selectInput("soro", label = "Select a Product:", choices = prThings, selected = "pot plants" ),  wordcloud2Output("wCloud"))  ))
+  
+)
+
+server <-function(input, output) {
+  
+  output$tab <- renderTable(head(iris))
+  
+  output$plotly1 <- renderPlotly({
+    plot_ly(data=new, x=~department, y=~avgReOrder, type = "bar")
+
+    #plot_ly(data=new2, labels = ~department, values = ~Total, type = 'pie')
+  })
+  
+  output$p2 <- renderPlotly({
+    
+    plot_ly(data=new2, labels = ~department, values = ~Total, type = 'pie')
+    
+  })
+  
+  output$p3 <- renderPlotly({
+    
+    plot_ly(data=orders, x = ~order_hour_of_day, type = "histogram")
+    
+  })
+  
+  output$p4 <- renderPlotly({
+    
+    plot_ly(data=orders, x=~days_since_prior_order, type = "histogram")
+    
+  })
+  
+  df2 <- reactive({
+    
+    df_m3 <- df_m2 %>% select(lhs, rhs, confidence) %>% filter(lhs %in% input$soro) %>% mutate(word = rhs, freq = confidence*10) %>% select(word, freq)
+    
+    
+  })
+  
+  
+  df <- reactive({
+  
+    #tab <- wb %>% filter(Region == input$regionn) %>% filter(Year == input$integer) %>% group_by( Country) %>% filter(Country %in% input$variable) %>% summarise( fertility = mean(Fertility), lifeExpectancy = mean(LifeExpectancy), populationn = mean(Population), region_update = Region)
+    
+    orderSize2 <- orderSize2 %>% filter(organicRatio >= input$organicRatio)
+    
+  })
+  
+  output$plotTS <- renderPlot({
+    
+    fit <- lm(count ~ date_order, data = byDay)
+
+
+   p <- ggplot(data = byDay, aes(x = date_order, y = count, color = Year)) + geom_point() + stat_function(fun= function(x) predict(fit, newdata=data.frame(date_order=x), type='response'), size = 1, color = "black") + labs(x = "Year-Month",y = "# of Orders", color = "Year") +  ggtitle("Number of Orders Over Time") + theme(plot.title = element_text(hjust = 0.5))
+  
+    plot_grid(p)
+    
+  })
+  
+  output$wCloud <- renderWordcloud2({
+    
+    wordcloud2(df2(), backgroundColor = "white", size = 0.25)
+    
+    #wordcloud2(df_m3, backgroundColor = "indianred3" )
+    #wordcloud(df_m3$rhs, df_m3$confidence , scale=c(5, .5), random.order = FALSE, random.color = FALSE, colors= c("indianred1","indianred2","indianred3","indianred") )
+    
+  })
+  
+  output$byReorder <- renderPlot({
+    
+    
+    
+    p <- ggplot(data = byReorder, aes(x = re, y = count)) + geom_bar(stat = "identity", fill="#FF6692", color = "black") + scale_y_continuous(labels = comma) + xlab("Re-ordered") + ylab("Count") + ggtitle("Distribution of Reordered Products in Instacart App") + theme(plot.title = element_text(hjust = 0.5)) + geom_label(aes(label = round(prop, 2), y = count - 1000000), color = "black", fill = "#FF6692", size = 3.2)
+    
+    q <- ggplot(data = dowDf, aes(x = dow, y = count)) + geom_bar(stat="identity",fill="#AB63FA", color = "black") + scale_y_continuous(labels = comma) + ggtitle("Distribution of Days of Week in Instacart App") + ylab("Count") + xlab("Day") + theme(plot.title = element_text(hjust = 0.5)) +  geom_label(aes(label = round(prop, 2), y = count - 50000), color = "white", fill = "#AB63FA", size = 3.2)
+    
+    
+    
+    plot_grid(p, q)
+    
+    
+    
+    
+    })
+  
+  output$itemFreq <- renderPlot({
+    
+    p <- ggplot(data = itemDist1, aes(x = itemDescription, y = count)) + geom_bar(stat = "identity" , fill = "#FF6692" ) + theme(axis.text.x = element_text(angle = 45, hjust = 1)) + geom_label(aes(label = round(prop, 2), y = count - 100), color = "black", fill = "#FF6692", size = 3.2) + xlab("Product Name") + ylab("Count") + ggtitle("Top 10 Most Frequent Products Bought In-Person") + theme(plot.title = element_text(hjust = 0.5))
+    
+    q <- ggplot(data = days1, aes(x = weekday, y = count)) + geom_bar(stat = "identity", fill = "#AB63FA") + xlab("") + ylab("Count") + geom_label(aes(label = round(prop, 2), y = count - 100), color = "white", fill = "#AB63FA", size = 3.2) + ggtitle("Distribution of Transactions Per Weekday") + theme(plot.title = element_text(hjust = 0.5))
+    
+    plot_grid(p,q)
+    
+    
+  })
+  
+  output$organic <- renderPlot({
+    
+    p <- ggplot(data = organicDf, aes(x = organic, y = count)) + geom_bar(stat = "identity", fill ="#AB63FA", color = "black") + xlab("") + ylab("Count") + ggtitle("Distribution of Organic Products in Instacart App") + theme(plot.title = element_text(hjust = 0.5)) + geom_label(aes(label = round(prop, 2), y = count - 2500), color = "white", fill = "#AB63FA", size = 3.2)
+    
+    q <- ggplot(data = tmp2, aes(x = organic, y = mre)) + geom_bar(stat = "identity", fill = "#FF6692", color = "black") + xlab("") + ggtitle("Mean Re-order Rate Per Organic Category") + ylab("Mean Re-Order Rate \n") + theme(plot.title = element_text(hjust = 0.5))  + geom_label(aes(label=round(mre, 2), y=mre-0.03),color="black", fill = "#FF6692",size=3.2)
+    
+    
+    plot_grid(p, q)
+    
+    
+    })
+  
+  output$os <- renderPlot({
+    
+    ggplot(data = df(), aes(x = count)) + geom_histogram(bins = input$bins, fill= "#FF6692") + scale_y_continuous(labels = comma) + xlab("Size of Order") + ylab("Frequency") + ggtitle("Distribution of Order Size in Instacart Service")  + theme(plot.title = element_text(hjust = 0.5))
+    
+    
+  })
+  
+  output$os2 <- renderPlot({
+    
+    ggplot(data = sampOrder, aes(x = count, y = organicRatio)) + geom_point(size=3, shape=21, fill= "#AB63FA", color="black", alpha=0.8, color = "black") + labs(title="Order Size vs. Ratio of Organic Products",subtitle = "Data on 200,000 Instacart Users",x = "# of Products in Order",y = "Ratio of Organic Products") + geom_smooth(span=1, se=TRUE, color = "black" )
+    
+  })
+  
+  output$organicReorder <- renderPlot({
+    
+    ggplot(data = tmp2, aes(x = organic, y = mre)) + geom_bar(stat = "identity", fill = "#FF6692", color = "black") + xlab("") + ggtitle("Mean Re-order Rate Per Organic Category") + ylab("Mean Re-Order Rate \n") + theme(plot.title = element_text(hjust = 0.5))  + geom_label(aes(label=round(mre, 2), y=mre-0.03),color="black", fill = "#FF6692",size=3.2)
+    
+    })
+  
+  output$pltTreemap <- renderPlot({
+    
+    treemap(tmp15,index=c("department","aisle"),vSize="n",title="",palette="Set3",border.col="#FFFFFF")
+
+    
+    #treemap(tmp2,index=c("department_id","aisle_id"),vSize="sumcount",title="",palette="Set3",border.col="#FFFFFF")
+    
+    
+    
+  })
+  
+  output$plot1 <- renderImage({
+    
+    return(list(
+      src = "image1.png",
+      contentType = "image/png",
+      alt = "Face"
+    ))
+    
+  })
+  
+}
+
+shinyApp(ui = ui, server = server)
+
+```
+
+
+
